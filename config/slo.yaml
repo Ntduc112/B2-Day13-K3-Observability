@@ -4,13 +4,17 @@ slis:
   latency_p95_ms:
     objective: 3000
     target: 99.5
-    note: Replace with your group's target
+    note: Target P95 response latency under 3000ms for 99.5% of requests over 28d.
   error_rate_pct:
     objective: 2
     target: 99.0
+    note: Target HTTP error rate under 2.0% for 99.0% of request windows over 28d.
   daily_cost_usd:
     objective: 2.5
     target: 100.0
+    note: Target total daily API cost under $2.50 across all models.
   quality_score_avg:
     objective: 0.75
     target: 95.0
+    note: Target average AI response quality score above 0.75 for 95% of requests.
+
