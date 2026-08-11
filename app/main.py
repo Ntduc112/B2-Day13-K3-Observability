@@ -22,6 +22,28 @@ app.add_middleware(CorrelationIdMiddleware)
 agent = LabAgent()
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return a consistent 500 response while preserving request evidence."""
+    error_type = type(exc).__name__
+    correlation_id = getattr(request.state, "correlation_id", "MISSING")
+    bind_contextvars(correlation_id=correlation_id)
+    record_error(error_type)
+    log.error(
+        "request_failed",
+        service="api",
+        error_type=error_type,
+        payload={"detail": str(exc)},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": error_type,
+            "correlation_id": correlation_id,
+        },
+    )
+
+
 @app.on_event("startup")
 async def startup() -> None:
     log.info(
@@ -44,9 +66,13 @@ async def metrics() -> dict:
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
-    # TODO: Enrich logs with request context (user_id_hash, session_id, feature, model, env)
-    # bind_contextvars(...)
-    
+    bind_contextvars(
+        user_id_hash=hash_user_id(body.user_id),
+        session_id=body.session_id,
+        feature=body.feature,
+        model=agent.model,
+        env=os.getenv("APP_ENV", "dev"),
+    )
     log.info(
         "request_received",
         service="api",
@@ -78,7 +104,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             cost_usd=result.cost_usd,
             quality_score=result.quality_score,
         )
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover - exercised by failure tests
         error_type = type(exc).__name__
         record_error(error_type)
         log.error(
