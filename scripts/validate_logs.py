@@ -7,11 +7,22 @@ LOG_PATH = Path("data/logs.jsonl")
 REQUIRED_FIELDS = {"ts", "level", "service", "event", "correlation_id"}
 ENRICHMENT_FIELDS = {"user_id_hash", "session_id", "feature", "model"}
 PII_DETECTORS = {
-    "email": re.compile(r"[\w.-]+@[\w.-]+\.\w+"),
-    "phone_vn": re.compile(r"(?<!\d)(?:\+84|0)(?:[ .-]?\d){9}(?!\d)"),
-    "cccd": re.compile(r"\b\d{12}\b"),
-    "credit_card": re.compile(r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b"),
+    "email": re.compile(
+        r"(?<![\w.+-])[\w.%+-]+@(?:[\w-]+\.)+[A-Za-z]{2,63}(?![\w.-])"
+    ),
+    "credit_card": re.compile(
+        r"(?<!\d)\d{4}(?:[ -]?\d{4}){3}(?![ -]?\d)"
+    ),
+    "cccd": re.compile(r"(?<!\d)\d{3}(?:[ .-]?\d{3}){3}(?![ .-]?\d)"),
+    "phone_vn": re.compile(
+        r"(?<![\d+])(?:\+?84|0)(?:[ .-]?\d){9,10}(?![ .-]?\d)"
+    ),
+    "passport": re.compile(r"(?<![A-Za-z0-9])[A-Z]{1,2}\d{7}(?![A-Za-z0-9])"),
+    "address": re.compile(
+        r"(?i:\b(?:địa\s*chỉ|dia\s*chi|address)\s*[:=]\s*)[^\n;]+"
+    ),
 }
+
 
 def main() -> None:
     if not LOG_PATH.exists():
@@ -41,12 +52,12 @@ def main() -> None:
         # Check required fields (global)
         if not {"ts", "level", "event"}.issubset(rec.keys()):
             missing_required += 1
-            
+
         # Context-specific checks for API requests
         if rec.get("service") == "api":
             if "correlation_id" not in rec or rec.get("correlation_id") == "MISSING":
                 missing_required += 1
-            
+
             if not ENRICHMENT_FIELDS.issubset(rec.keys()):
                 missing_enrichment += 1
 
@@ -76,7 +87,7 @@ def main() -> None:
         types = sorted({pii_type for hit in pii_hits for pii_type in hit["types"]})
         print(f"  Events with leaks: {events}")
         print(f"  PII types detected: {types}")
-    
+
     print("\n--- Grading Scorecard (Estimates) ---")
     score = 100
     if missing_required > 0:
@@ -104,6 +115,7 @@ def main() -> None:
         print("+ [PASSED] PII scrubbing")
 
     print(f"\nEstimated Score: {max(0, score)}/100")
+
 
 if __name__ == "__main__":
     main()
