@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections import Counter
 from statistics import mean
 
@@ -32,9 +33,23 @@ def percentile(values: list[int], p: int) -> float:
     if not values:
         return 0.0
     items = sorted(values)
-    idx = max(0, min(len(items) - 1, round((p / 100) * len(items) + 0.5) - 1))
+    idx = max(0, min(len(items) - 1, math.ceil((p / 100) * len(items)) - 1))
     return float(items[idx])
 
+
+
+def error_rate_pct() -> float:
+    """Tỉ lệ lỗi trên tổng số lần thử.
+
+    Mẫu số là TRAFFIC + số lỗi chứ không phải TRAFFIC, vì TRAFFIC chỉ tăng khi
+    request chạy xong thành công. Lấy TRAFFIC làm mẫu số thì kịch bản hỏng
+    100% sẽ chia cho 0.
+    """
+    errors_total = sum(ERRORS.values())
+    attempts = TRAFFIC + errors_total
+    if attempts == 0:
+        return 0.0
+    return round(errors_total / attempts * 100, 2)
 
 
 def snapshot() -> dict:
@@ -47,6 +62,8 @@ def snapshot() -> dict:
         "total_cost_usd": round(sum(REQUEST_COSTS), 4),
         "tokens_in_total": sum(REQUEST_TOKENS_IN),
         "tokens_out_total": sum(REQUEST_TOKENS_OUT),
+        "errors_total": sum(ERRORS.values()),
+        "error_rate_pct": error_rate_pct(),
         "error_breakdown": dict(ERRORS),
         "quality_avg": round(mean(QUALITY_SCORES), 4) if QUALITY_SCORES else 0.0,
     }
